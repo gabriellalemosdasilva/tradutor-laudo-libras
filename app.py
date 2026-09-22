@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from pypdf import PdfReader
 
 # Configuração da página
@@ -7,33 +8,38 @@ st.set_page_config(page_title="Tradutor de Laudos para LIBRAS", layout="wide")
 st.title("🩺 Tradutor Assistivo de Laudos Médicos")
 st.markdown("Faça o upload do seu laudo médico e visualize os termos e explicações em LIBRAS.")
 
-# Função para converter link ou ID do Google Drive em link incorporável (embed)
-def get_drive_embed_url(url_ou_id: str) -> str:
-    if "drive.google.com" in url_ou_id:
-        if "/d/" in url_ou_id:
-            file_id = url_ou_id.split("/d/")[1].split("/")[0]
-        elif "id=" in url_ou_id:
-            file_id = url_ou_id.split("id=")[1].split("&")[0]
+# URL da sua planilha publicada como CSV no Google Sheets
+URL_PLANILHA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvbw2ebNuVIG6VW0aL8aSkYHumixO8HqE3ZgOHsoAozlLQQDOGgoc112Ppc1eMpl_uTfZYiU6ZgNPJ/pub?output=csv"
+
+@st.cache_data(ttl=600)  # Guarda em cache por 10 min para ser rápido
+def carregar_glossario(url):
+    try:
+        df = pd.read_csv(url)
+        # Garante que os termos fiquem minúsculos e sem espaços sobrando
+        df['termo'] = df['termo'].astype(str).str.strip().str.lower()
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar glossário online: {e}")
+        return pd.DataFrame(columns=["termo", "sinal", "explicacao"])
+
+# Função para converter qualquer formato de link do Google Drive para visualização embutida (embed)
+def formatar_drive_embed(url_ou_id: str) -> str:
+    url_str = str(url_ou_id).strip()
+    if "drive.google.com" in url_str:
+        if "/d/" in url_str:
+            file_id = url_str.split("/d/")[1].split("/")[0]
+        elif "id=" in url_str:
+            file_id = url_str.split("id=")[1].split("&")[0]
         else:
-            file_id = url_ou_id
+            file_id = url_str
     else:
-        file_id = url_ou_id
+        file_id = url_str
     return f"https://drive.google.com/file/d/{file_id}/preview"
 
-# Dicionário de conhecimento com links/IDs do Google Drive
-# Lembre-se: o vídeo no Drive deve estar com compartilhamento: "Qualquer pessoa com o link pode ver"
-base_conhecimento = {
-    "escoliose": {
-        "sinal": "1ABC123ExemploIDSinalEscoliose",       # Cole o ID ou link completo do Drive
-        "explicacao": "1XYZ789ExemploIDDefinicaoEscoliose"
-    },
-    "cifose": {
-        "sinal": "https://drive.google.com/file/d/ID_CIFOSE_EXEMPLO/view",
-        "explicacao": "https://drive.google.com/file/d/ID_CIFOSE_EXPLICACAO/view"
-    }
-}
+# Carregamento do banco de dados
+df_glossario = carregar_glossario(URL_PLANILHA_CSV)
 
-# Upload do arquivo
+# Upload do laudo
 uploaded_file = st.file_uploader("Escolha o arquivo do laudo (PDF ou TXT)", type=['txt', 'pdf'])
 
 if uploaded_file is not None:
@@ -48,7 +54,7 @@ if uploaded_file is not None:
                 if texto_pagina:
                     conteudo_bruto += texto_pagina + " "
         except Exception as e:
-            st.error(f"Erro ao ler o PDF: {e}")
+            st.error(f"Erro ao extrair texto do PDF: {e}")
     else:
         try:
             conteudo_bruto = uploaded_file.read().decode("utf-8")
@@ -57,13 +63,15 @@ if uploaded_file is not None:
 
     conteudo_limpo = " ".join(conteudo_bruto.split()).lower()
 
-    # Filtro de Seção: prioriza seções finais (Conclusão / Impressão diagnóstica)
-    secoes_relevantes = ["conclusão", "conclusao", "impressão diagnóstica", "impressao diagnostica", "diagnóstico", "diagnostico"]
+    # Priorização das seções de conclusão/impressão diagnóstica
+    secoes_relevantes = [
+        "conclusão", "conclusao", "impressão diagnóstica", 
+        "impressao diagnostica", "diagnóstico", "diagnostico", "comentários"
+    ]
     texto_analise = conteudo_limpo
 
     for secao in secoes_relevantes:
         if secao in conteudo_limpo:
-            # Pega o texto a partir do ponto onde a palavra de conclusão aparece
             texto_analise = conteudo_limpo.split(secao, 1)[1]
             st.info(f"Análise focada a partir da seção: **{secao.upper()}**")
             break
@@ -71,32 +79,31 @@ if uploaded_file is not None:
     with st.expander("📄 Ver texto processado do laudo"):
         st.write(texto_analise)
 
-    # Identificação de TODOS os termos presentes no laudo
-    termos_encontrados = [termo for termo in base_conhecimento.keys() if termo in texto_analise]
+    # Identificação dos termos presentes no laudo a partir da planilha
+    termos_cadastrados = df_glossario['termo'].tolist()
+    termos_encontrados = [t for t in termos_cadastrados if str(t) in texto_analise]
 
-    # Exibição dos resultados
     if termos_encontrados:
-        st.success(f"{len(termos_encontrados)} termo(s) identificado(s): **{', '.join([t.upper() for t in termos_encontrados])}**")
+        st.success(f"{len(termos_encontrados)} termo(s) clínico(s) identificado(s): **{', '.join([t.upper() for t in termos_encontrados])}**")
         st.markdown("---")
 
-        # Cria uma aba para cada termo encontrado
-        abas = st.tabs([f"📌 {termo.upper()}" for termo in termos_encontrados])
+        abas = st.tabs([f"📌 {t.upper()}" for t in termos_encontrados])
 
-        for aba, termo in zip(abas, termos_encontrados):
+        for aba, t in zip(abas, termos_encontrados):
             with aba:
-                col1, col2 = st.columns(2)
-                url_sinal = get_drive_embed_url(base_conhecimento[termo]["sinal"])
-                url_expl = get_drive_embed_url(base_conhecimento[termo]["explicacao"])
+                linha = df_glossario[df_glossario['termo'] == t].iloc[0]
+                url_sinal = formatar_drive_embed(linha['sinal'])
+                url_expl = formatar_drive_embed(linha['explicacao'])
 
+                col1, col2 = st.columns(2)
                 with col1:
-                    st.subheader("🤲 Sinal em Libras")
+                    st.subheader("🤲 Sinal em LIBRAS")
                     st.markdown(
                         f'<iframe src="{url_sinal}" width="100%" height="340" style="border:none; border-radius:8px;" allow="autoplay"></iframe>',
                         unsafe_allow_html=True
                     )
-
                 with col2:
-                    st.subheader("💡 Descrição")
+                    st.subheader("💡 Explicação Clínica")
                     st.markdown(
                         f'<iframe src="{url_expl}" width="100%" height="340" style="border:none; border-radius:8px;" allow="autoplay"></iframe>',
                         unsafe_allow_html=True
@@ -104,4 +111,4 @@ if uploaded_file is not None:
     else:
         st.warning("Nenhum termo clínico cadastrado no glossário foi identificado neste laudo.")
 else:
-    st.info("Por favor, faça o upload de um arquivo para iniciar a análise.")
+    st.info("Faça o upload de um laudo para iniciar a análise.")
