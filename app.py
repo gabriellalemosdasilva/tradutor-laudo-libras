@@ -22,7 +22,7 @@ def carregar_glossario(url):
         st.error(f"Erro ao carregar glossário online: {e}")
         return pd.DataFrame(columns=["termo", "sinal", "explicacao"])
 
-# Função para extrair o ID do YouTube e embutir player com autoplay, loop e mute
+# Função para youtube - loop e autoplay
 def montar_player_loop(url_youtube: str) -> str:
     url_str = str(url_youtube).strip()
     video_id = ""
