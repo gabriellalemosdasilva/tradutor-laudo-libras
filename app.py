@@ -11,7 +11,7 @@ st.markdown("Faça o upload do seu laudo médico e visualize os termos e explica
 # url do google sheets
 URL_PLANILHA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvbw2ebNuVIG6VW0aL8aSkYHumixO8HqE3ZgOHsoAozlLQQDOGgoc112Ppc1eMpl_uTfZYiU6ZgNPJ/pub?output=csv"
 
-# Carregamento do youtube
+# Carregamento do glossário
 @st.cache_data(ttl=10)
 def carregar_glossario(url):
     try:
@@ -21,6 +21,33 @@ def carregar_glossario(url):
     except Exception as e:
         st.error(f"Erro ao carregar glossário online: {e}")
         return pd.DataFrame(columns=["termo", "sinal", "explicacao"])
+
+# Função para extrair o ID do YouTube e embutir player com autoplay, loop e mute
+def montar_player_loop(url_youtube: str) -> str:
+    url_str = str(url_youtube).strip()
+    video_id = ""
+    
+    if "watch?v=" in url_str:
+        video_id = url_str.split("watch?v=")[1].split("&")[0]
+    elif "youtu.be/" in url_str:
+        video_id = url_str.split("youtu.be/")[1].split("?")[0]
+    else:
+        video_id = url_str
+
+    url_embed = f"https://www.youtube.com/embed/{video_id}?autoplay=1&loop=1&playlist={video_id}&mute=1"
+    
+    return f'''
+        <iframe 
+            width="100%" 
+            height="340" 
+            src="{url_embed}" 
+            title="Sinal em Libras" 
+            frameborder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowfullscreen 
+            style="border-radius: 8px;">
+        </iframe>
+    '''
 
 df_glossario = carregar_glossario(URL_PLANILHA_CSV)
 
@@ -79,13 +106,17 @@ if uploaded_file is not None:
                 linha = df_glossario[df_glossario['termo'] == t].iloc[0]
 
                 col1, col2 = st.columns(2)
+                
+                # Coluna 1: Sinal em LIBRAS com loop automático sem necessidade de play
                 with col1:
                     st.subheader("🤲 Sinal em LIBRAS")
                     if pd.notna(linha['sinal']) and str(linha['sinal']).strip() != "":
-                        st.video(str(linha['sinal']).strip())
+                        html_player = montar_player_loop(linha['sinal'])
+                        st.markdown(html_player, unsafe_allow_html=True)
                     else:
                         st.warning("Vídeo do sinal não cadastrado.")
 
+                # Coluna 2: Explicação Clínica convencional (play sob demanda)
                 with col2:
                     st.subheader("💡 Explicação Clínica")
                     if pd.notna(linha['explicacao']) and str(linha['explicacao']).strip() != "":
