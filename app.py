@@ -2,44 +2,29 @@ import streamlit as st
 import pandas as pd
 from pypdf import PdfReader
 
-# Configuração da página
-st.set_page_config(page_title="Tradutor de Laudos para LIBRAS", layout="wide")
+# Página Inicial
+st.set_page_config(page_title="Tradutor de Laudos para Libras", layout="wide")
 
 st.title("🩺 Tradutor Assistivo de Laudos Médicos")
-st.markdown("Faça o upload do seu laudo médico e visualize os termos e explicações em LIBRAS.")
+st.markdown("Faça o upload do seu laudo médico e visualize os termos e explicações em Libras.")
 
-# URL da sua planilha publicada como CSV no Google Sheets
-URL_PLANILHA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvbw2ebNuVIG6VW0aL8aSkYHumixO8HqE3ZgOHsoAozlLQQDOGgoc112Ppc1eMpl_uTfZYiU6ZgNPJ/pub?output=csv"
+# url do google sheets
+URL_PLANILHA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvbw2ebNuVIG6VW0aL8aSkYHumixO8HqE3ZgOHsoAozlLQQDOGgoc112Ppc1eMpl_uTfZYiU6ZgNPJ/pub?output=csv%22"
 
-@st.cache_data(ttl=600)  # Guarda em cache por 10 min para ser rápido
+# Carregamento do youtube
+@st.cache_data(ttl=10)
 def carregar_glossario(url):
     try:
         df = pd.read_csv(url)
-        # Garante que os termos fiquem minúsculos e sem espaços sobrando
         df['termo'] = df['termo'].astype(str).str.strip().str.lower()
         return df
     except Exception as e:
         st.error(f"Erro ao carregar glossário online: {e}")
         return pd.DataFrame(columns=["termo", "sinal", "explicacao"])
 
-# Função para converter qualquer formato de link do Google Drive para visualização embutida (embed)
-def formatar_drive_embed(url_ou_id: str) -> str:
-    url_str = str(url_ou_id).strip()
-    if "drive.google.com" in url_str:
-        if "/d/" in url_str:
-            file_id = url_str.split("/d/")[1].split("/")[0]
-        elif "id=" in url_str:
-            file_id = url_str.split("id=")[1].split("&")[0]
-        else:
-            file_id = url_str
-    else:
-        file_id = url_str
-    return f"https://drive.google.com/file/d/{file_id}/preview"
-
-# Carregamento do banco de dados
 df_glossario = carregar_glossario(URL_PLANILHA_CSV)
 
-# Upload do laudo
+# Upload do arquivo
 uploaded_file = st.file_uploader("Escolha o arquivo do laudo (PDF ou TXT)", type=['txt', 'pdf'])
 
 if uploaded_file is not None:
@@ -63,7 +48,7 @@ if uploaded_file is not None:
 
     conteudo_limpo = " ".join(conteudo_bruto.split()).lower()
 
-    # Priorização das seções de conclusão/impressão diagnóstica
+    # Procurar Conclusão
     secoes_relevantes = [
         "conclusão", "conclusao", "impressão diagnóstica", 
         "impressao diagnostica", "diagnóstico", "diagnostico", "comentários"
@@ -79,7 +64,7 @@ if uploaded_file is not None:
     with st.expander("📄 Ver texto processado do laudo"):
         st.write(texto_analise)
 
-    # Identificação dos termos presentes no laudo a partir da planilha
+    # Identificação dos termos
     termos_cadastrados = df_glossario['termo'].tolist()
     termos_encontrados = [t for t in termos_cadastrados if str(t) in texto_analise]
 
@@ -92,22 +77,21 @@ if uploaded_file is not None:
         for aba, t in zip(abas, termos_encontrados):
             with aba:
                 linha = df_glossario[df_glossario['termo'] == t].iloc[0]
-                url_sinal = formatar_drive_embed(linha['sinal'])
-                url_expl = formatar_drive_embed(linha['explicacao'])
 
                 col1, col2 = st.columns(2)
                 with col1:
                     st.subheader("🤲 Sinal em LIBRAS")
-                    st.markdown(
-                        f'<iframe src="{url_sinal}" width="100%" height="340" style="border:none; border-radius:8px;" allow="autoplay"></iframe>',
-                        unsafe_allow_html=True
-                    )
+                    if pd.notna(linha['sinal']) and str(linha['sinal']).strip() != "":
+                        st.video(str(linha['sinal']).strip())
+                    else:
+                        st.warning("Vídeo do sinal não cadastrado.")
+
                 with col2:
                     st.subheader("💡 Explicação Clínica")
-                    st.markdown(
-                        f'<iframe src="{url_expl}" width="100%" height="340" style="border:none; border-radius:8px;" allow="autoplay"></iframe>',
-                        unsafe_allow_html=True
-                    )
+                    if pd.notna(linha['explicacao']) and str(linha['explicacao']).strip() != "":
+                        st.video(str(linha['explicacao']).strip())
+                    else:
+                        st.warning("Vídeo de explicação não cadastrado.")
     else:
         st.warning("Nenhum termo clínico cadastrado no glossário foi identificado neste laudo.")
 else:
