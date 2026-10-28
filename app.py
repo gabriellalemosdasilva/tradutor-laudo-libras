@@ -9,7 +9,7 @@ st.title("🩺 Tradutor Assistivo de Laudos Médicos")
 st.markdown("Faça o upload do seu laudo médico e visualize os termos e explicações em Libras.")
 
 # url do google sheets
-URL_PLANILHA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvbw2ebNuVIG6VW0aL8aSkYHumixO8HqE3ZgOHsoAozlLQQDOGgoc112Ppc1eMpl_uTfZYiU6ZgNPJ/pub?output=csv%22"
+URL_PLANILHA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSvbw2ebNuVIG6VW0aL8aSkYHumixO8HqE3ZgOHsoAozlLQQDOGgoc112Ppc1eMpl_uTfZYiU6ZgNPJ/pub?output=csv"
 
 # Carregamento do youtube
 @st.cache_data(ttl=10)
