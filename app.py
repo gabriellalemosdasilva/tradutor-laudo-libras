@@ -107,7 +107,7 @@ if uploaded_file is not None:
 
                 col1, col2 = st.columns(2)
                 
-                # Coluna 1: Sinal em LIBRAS com loop automático sem necessidade de play
+                # Coluna 1 - sinal em Libras, reprodução automática e em Loop
                 with col1:
                     st.subheader("🤲 Sinal em LIBRAS")
                     if pd.notna(linha['sinal']) and str(linha['sinal']).strip() != "":
@@ -116,7 +116,7 @@ if uploaded_file is not None:
                     else:
                         st.warning("Vídeo do sinal não cadastrado.")
 
-                # Coluna 2: Explicação Clínica convencional (play sob demanda)
+                # Coluna 2 - explicação em Libras
                 with col2:
                     st.subheader("💡 Explicação Clínica")
                     if pd.notna(linha['explicacao']) and str(linha['explicacao']).strip() != "":
